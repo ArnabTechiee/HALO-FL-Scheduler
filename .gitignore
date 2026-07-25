@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific virtual environments
+halo-env/
+halo-env313/
+halo-env-fresh/
+halo-env312/
