@@ -45,7 +45,7 @@ def train(msg: Message, context: Context):
     telemetry_fields = flatten_telemetry(telemetry_snapshot)
 
     # 🔍 Temporary debug print to verify telemetry pipeline
-    print(f"[HALO DEBUG] Telemetry sent: {telemetry_fields}")
+    # print(f"[HALO DEBUG] Telemetry sent: {telemetry_fields}")
 
     # Construct and return reply Message
     model_record = ArrayRecord(model.state_dict())
