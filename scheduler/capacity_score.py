@@ -9,6 +9,32 @@ representing how much training work a client can currently handle.
 Values in between = reduced workload (fewer local epochs / smaller batch)
 """
 
+# -------------------------------------------------------------------
+# TEMPORARY TEST FLAG – set to False for normal operation
+# When True, every client will be skipped (score 0.0) to test Flower's
+# behaviour when no clients participate in a round.
+# -------------------------------------------------------------------
+FORCE_SKIP_ALL = False   # <-- Disabled – normal scoring is now active
+
+def unflatten_telemetry(flat: dict) -> dict:
+    """Reverses telemetry.py's flatten_telemetry() back into the nested
+    shape compute_capacity_score() expects."""
+    has_battery = flat.get("telem_has_battery", 0)
+    battery = None
+    if has_battery:
+        battery = {
+            "percent": flat["telem_battery_percent"],
+            "plugged_in": bool(flat["telem_battery_plugged_in"]),
+        }
+
+    latency = flat.get("telem_network_latency_ms", -1)
+
+    return {
+        "cpu_percent": flat["telem_cpu_percent"],
+        "memory": {"percent_used": flat["telem_mem_percent_used"]},
+        "battery": battery,
+        "network_latency_ms": None if latency == -1 else latency,
+    }
 
 def compute_capacity_score(telemetry: dict) -> float:
     """
@@ -16,6 +42,12 @@ def compute_capacity_score(telemetry: dict) -> float:
     the client (see client_app.py's flatten_telemetry()).
     Returns 0.0 (skip) to 1.0 (full capacity).
     """
+    # -----------------------------------------------------------------
+    # TEMPORARY OVERRIDE – remove this block after testing
+    if FORCE_SKIP_ALL:
+        return 0.0
+    # -----------------------------------------------------------------
+
     score = 1.0
 
     # --- Battery ---
@@ -57,7 +89,7 @@ def score_to_local_epochs(score: float, base_epochs: int = 1) -> int:
     — that's fine for a first working version."""
     if score == 0.0:
         return 0
-    elif score < 0.5:
+    elif score < 1.0:
         return max(1, round(base_epochs * 0.5))
     else:
         return base_epochs
