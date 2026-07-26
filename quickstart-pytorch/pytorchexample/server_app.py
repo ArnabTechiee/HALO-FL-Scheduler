@@ -1,9 +1,10 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""pytorchexample: A Flower / PyTorch app with HALO adaptive scheduling."""
 
 import torch
 from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
-from flwr.serverapp.strategy import FedAvg
+# --- HALO: use the custom adaptive strategy ---
+from pytorchexample.adaptive_strategy import AdaptiveFedAvg
 
 from pytorchexample.task import Net, load_centralized_dataset, test
 
@@ -24,10 +25,14 @@ def main(grid: Grid, context: Context) -> None:
     global_model = Net()
     arrays = ArrayRecord(global_model.state_dict())
 
-    # Initialize FedAvg strategy
-    strategy = FedAvg(fraction_evaluate=fraction_evaluate)
+    # Initialize AdaptiveFedAvg strategy (uses telemetry to adapt epochs)
+    # base_local_epochs=2 is set to allow visible reduction (e.g., to 1) for intermediate scores
+    strategy = AdaptiveFedAvg(
+        fraction_evaluate=fraction_evaluate,
+        base_local_epochs=2
+    )
 
-    # Start strategy, run FedAvg for `num_rounds`
+    # Start strategy, run for `num_rounds`
     result = strategy.start(
         grid=grid,
         initial_arrays=arrays,

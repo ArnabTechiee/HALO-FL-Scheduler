@@ -32,10 +32,14 @@ def train(msg: Message, context: Context):
     trainloader, _ = load_data(partition_id, num_partitions, batch_size)
 
     # Call the training function
+    local_epochs = msg.content["config"].get(
+        "local-epochs", context.run_config["local-epochs"]
+    )
+
     train_loss = train_fn(
         model,
         trainloader,
-        context.run_config["local-epochs"],
+        local_epochs,
         msg.content["config"]["lr"],
         device,
     )
