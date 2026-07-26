@@ -44,6 +44,8 @@ class AdaptiveFedAvg(FedAvg):
                 local_epochs = self.base_local_epochs
                 print(f"[HALO DEBUG] node {node_id} -> no telemetry yet, using base local_epochs={local_epochs}")
             else:
+                # Added raw telemetry print before scoring
+                print(f"[HALO RAW] node {node_id} telemetry going into scorer: {telemetry}")
                 score = compute_capacity_score(telemetry)
                 local_epochs = score_to_local_epochs(score, self.base_local_epochs)
                 print(f"[HALO DEBUG] node {node_id} -> score={score:.2f}, local_epochs={local_epochs}")

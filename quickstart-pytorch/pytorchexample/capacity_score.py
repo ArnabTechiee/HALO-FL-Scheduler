@@ -9,6 +9,13 @@ representing how much training work a client can currently handle.
 Values in between = reduced workload (fewer local epochs / smaller batch)
 """
 
+# -------------------------------------------------------------------
+# TEMPORARY TEST FLAG – set to False for normal operation
+# When True, every client will be skipped (score 0.0) to test Flower's
+# behaviour when no clients participate in a round.
+# -------------------------------------------------------------------
+FORCE_SKIP_ALL = False   # <-- Disabled – normal scoring is now active
+
 def unflatten_telemetry(flat: dict) -> dict:
     """Reverses telemetry.py's flatten_telemetry() back into the nested
     shape compute_capacity_score() expects."""
@@ -28,12 +35,19 @@ def unflatten_telemetry(flat: dict) -> dict:
         "battery": battery,
         "network_latency_ms": None if latency == -1 else latency,
     }
+
 def compute_capacity_score(telemetry: dict) -> float:
     """
     Accepts a flat telemetry dict using the telem_* field names sent by
     the client (see client_app.py's flatten_telemetry()).
     Returns 0.0 (skip) to 1.0 (full capacity).
     """
+    # -----------------------------------------------------------------
+    # TEMPORARY OVERRIDE – remove this block after testing
+    if FORCE_SKIP_ALL:
+        return 0.0
+    # -----------------------------------------------------------------
+
     score = 1.0
 
     # --- Battery ---
