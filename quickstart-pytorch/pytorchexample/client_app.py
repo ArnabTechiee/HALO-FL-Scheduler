@@ -8,6 +8,9 @@ from pytorchexample.task import Net, load_data
 from pytorchexample.task import test as test_fn
 from pytorchexample.task import train as train_fn
 
+# --- HALO: import telemetry helpers from inside the package ---
+from pytorchexample.telemetry import get_telemetry_snapshot, flatten_telemetry
+
 # Flower ClientApp
 app = ClientApp()
 
@@ -37,11 +40,19 @@ def train(msg: Message, context: Context):
         device,
     )
 
+    # --- HALO: capture telemetry right after local training finishes ---
+    telemetry_snapshot = get_telemetry_snapshot()
+    telemetry_fields = flatten_telemetry(telemetry_snapshot)
+
+    # 🔍 Temporary debug print to verify telemetry pipeline
+    print(f"[HALO DEBUG] Telemetry sent: {telemetry_fields}")
+
     # Construct and return reply Message
     model_record = ArrayRecord(model.state_dict())
     metrics = {
         "train_loss": train_loss,
         "num-examples": len(trainloader.dataset),
+        **telemetry_fields,  # HALO: attach telemetry to this round's reply
     }
     metric_record = MetricRecord(metrics)
     content = RecordDict({"arrays": model_record, "metrics": metric_record})

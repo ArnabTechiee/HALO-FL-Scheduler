@@ -11,32 +11,39 @@ Values in between = reduced workload (fewer local epochs / smaller batch)
 
 
 def compute_capacity_score(telemetry: dict) -> float:
+    """
+    Accepts a flat telemetry dict using the telem_* field names sent by
+    the client (see client_app.py's flatten_telemetry()).
+    Returns 0.0 (skip) to 1.0 (full capacity).
+    """
     score = 1.0
 
     # --- Battery ---
-    battery = telemetry.get("battery")
-    if battery is not None:
-        if battery["percent"] < 15 and not battery["plugged_in"]:
+    has_battery = telemetry.get("telem_has_battery", False)
+    if has_battery:
+        battery_pct = telemetry["telem_battery_percent"]
+        plugged_in = telemetry["telem_battery_plugged_in"]
+        if battery_pct < 15 and not plugged_in:
             return 0.0  # hard skip — protect the device
-        elif battery["percent"] < 30 and not battery["plugged_in"]:
+        elif battery_pct < 30 and not plugged_in:
             score *= 0.5
-    # battery is None (desktop) -> no penalty, skip this check entirely
+    # no battery (desktop) -> skip this check entirely, no penalty
 
     # --- CPU ---
-    cpu = telemetry["cpu_percent"]
+    cpu = telemetry["telem_cpu_percent"]
     if cpu > 85:
         score *= 0.4
     elif cpu > 60:
         score *= 0.7
 
     # --- Memory ---
-    if telemetry["memory"]["percent_used"] > 90:
+    if telemetry["telem_mem_percent_used"] > 90:
         score *= 0.5
 
     # --- Network ---
-    latency = telemetry.get("network_latency_ms")
-    if latency is None:
-        return 0.0  # unreachable -> skip
+    latency = telemetry["telem_network_latency_ms"]
+    if latency == -1:  # sentinel for unreachable
+        return 0.0
     elif latency > 300:
         score *= 0.6
 
@@ -57,51 +64,61 @@ def score_to_local_epochs(score: float, base_epochs: int = 1) -> int:
 
 
 if __name__ == "__main__":
-    # Quick manual tests using realistic and edge-case telemetry
+    # Quick manual tests using the new flat telem_* fields
     test_cases = [
         {
             "name": "Healthy laptop (like your real reading)",
             "telemetry": {
-                "cpu_percent": 34.3,
-                "memory": {"percent_used": 74.7},
-                "battery": {"percent": 92, "plugged_in": False},
-                "network_latency_ms": 19.5,
+                "telem_cpu_percent": 34.3,
+                "telem_mem_percent_used": 74.7,
+                "telem_has_battery": True,
+                "telem_battery_percent": 92,
+                "telem_battery_plugged_in": False,
+                "telem_network_latency_ms": 19.5,
             },
         },
         {
             "name": "Low battery, unplugged",
             "telemetry": {
-                "cpu_percent": 20.0,
-                "memory": {"percent_used": 50.0},
-                "battery": {"percent": 10, "plugged_in": False},
-                "network_latency_ms": 25.0,
+                "telem_cpu_percent": 20.0,
+                "telem_mem_percent_used": 50.0,
+                "telem_has_battery": True,
+                "telem_battery_percent": 10,
+                "telem_battery_plugged_in": False,
+                "telem_network_latency_ms": 25.0,
             },
         },
         {
             "name": "CPU maxed out",
             "telemetry": {
-                "cpu_percent": 95.0,
-                "memory": {"percent_used": 60.0},
-                "battery": {"percent": 80, "plugged_in": True},
-                "network_latency_ms": 30.0,
+                "telem_cpu_percent": 95.0,
+                "telem_mem_percent_used": 60.0,
+                "telem_has_battery": True,
+                "telem_battery_percent": 80,
+                "telem_battery_plugged_in": True,
+                "telem_network_latency_ms": 30.0,
             },
         },
         {
             "name": "Network unreachable",
             "telemetry": {
-                "cpu_percent": 20.0,
-                "memory": {"percent_used": 40.0},
-                "battery": {"percent": 80, "plugged_in": True},
-                "network_latency_ms": None,
+                "telem_cpu_percent": 20.0,
+                "telem_mem_percent_used": 40.0,
+                "telem_has_battery": True,
+                "telem_battery_percent": 80,
+                "telem_battery_plugged_in": True,
+                "telem_network_latency_ms": -1,
             },
         },
         {
             "name": "Desktop (no battery)",
             "telemetry": {
-                "cpu_percent": 30.0,
-                "memory": {"percent_used": 55.0},
-                "battery": None,
-                "network_latency_ms": 15.0,
+                "telem_cpu_percent": 30.0,
+                "telem_mem_percent_used": 55.0,
+                "telem_has_battery": False,
+                "telem_battery_percent": -1,  # placeholder, won't be used
+                "telem_battery_plugged_in": False,
+                "telem_network_latency_ms": 15.0,
             },
         },
     ]
