@@ -87,3 +87,22 @@ class AdaptiveFedAvg(FedAvg):
             print(f"[HALO DEBUG] node {msg.metadata.src_node_id} -> {self.last_known_telemetry[msg.metadata.src_node_id]}")
 
         return super().aggregate_train(server_round, replies)
+
+    def aggregate_evaluate(self, server_round: int, replies: Iterable[Message]):
+        replies = list(replies)
+
+        for msg in replies:
+            if msg.has_error():
+                continue
+            metrics = msg.content.get("metrics")
+            if metrics is None:
+                continue
+            # HALO: evaluate replies now also carry fresh telemetry — this
+            # is what lets a previously-skipped client "recover" once its
+            # real conditions improve, instead of staying frozen on stale
+            # data from the last round it actually trained
+            telemetry = {k: v for k, v in dict(metrics).items() if k.startswith("telem_")}
+            if telemetry:
+                self.last_known_telemetry[msg.metadata.src_node_id] = telemetry
+
+        return super().aggregate_evaluate(server_round, replies)

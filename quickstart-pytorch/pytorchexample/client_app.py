@@ -86,11 +86,19 @@ def evaluate(msg: Message, context: Context):
         device,
     )
 
+    # --- HALO: refresh telemetry here too, so a client that was skipped
+    # from training this round still reports current conditions — without
+    # this, a skipped client's telemetry freezes forever since it never
+    # trains again to send a fresh reading
+    telemetry_snapshot = get_telemetry_snapshot()
+    telemetry_fields = flatten_telemetry(telemetry_snapshot)
+
     # Construct and return reply Message
     metrics = {
         "eval_loss": eval_loss,
         "eval_acc": eval_acc,
         "num-examples": len(valloader.dataset),
+        **telemetry_fields,
     }
     metric_record = MetricRecord(metrics)
     content = RecordDict({"metrics": metric_record})
