@@ -54,5 +54,5 @@ save-model = false
 # default = "local-deploy"
 
 # [tool.flwr.federations.local-deploy]
-# address = "127.0.0.1:9093"
+# address = "100.73.255.59:9093"
 # insecure = true
