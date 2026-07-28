@@ -21,7 +21,7 @@ from flwr.app import (
     ConfigRecord,
     Message,
     MessageType,
-    MetricRecord,          # new import
+    MetricRecord,          # needed for _strip_identity_fields
     RecordDict,
 )
 from flwr.common import log
@@ -182,5 +182,8 @@ class AdaptiveFedAvg(FedAvg):
             # Keep partition tracking up‑to‑date from eval replies as well.
             if "telem_partition_id" in metrics_dict:
                 self.node_to_real_partition[node_id] = int(metrics_dict["telem_partition_id"])
+
+            # Strip identity fields so the aggregated evaluation metrics are clean.
+            self._strip_identity_fields(msg)
 
         return super().aggregate_evaluate(server_round, replies)
