@@ -29,7 +29,10 @@ def main(grid: Grid, context: Context) -> None:
     # base_local_epochs=2 is set to allow visible reduction (e.g., to 1) for intermediate scores
     strategy = AdaptiveFedAvg(
         fraction_evaluate=fraction_evaluate,
-        base_local_epochs=2
+        base_local_epochs=2,
+        min_available_nodes = 1,
+        min_train_nodes = 1,
+        min_evaluate_nodes = 1
     )
 
     # Start strategy, run for `num_rounds`

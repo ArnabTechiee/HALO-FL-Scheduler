@@ -28,6 +28,7 @@ class AdaptiveFedAvg(FedAvg):
     def configure_train(
         self, server_round: int, arrays: ArrayRecord, config: ConfigRecord, grid
     ) -> Iterable[Message]:
+        print(f"[HALO DEBUG] Known telemetry keys before this round: {list(self.last_known_telemetry.keys())}")
         if not self.last_known_telemetry:
             return super().configure_train(server_round, arrays, config, grid)
 
