@@ -44,17 +44,17 @@ class AdaptiveFedAvg(FedAvg):
         self.node_to_device[node_id] = device_id
 
         if device_id in self.device_to_partition:
-            # Returning device: drop its old (now-dead) node_id entries so
-            # they stop being counted as separately "dropped," and restore
-            # its original partition to the new node_id instead.
-            stale_nodes = [n for n, d in self.node_to_device.items()
-                           if d == device_id and n != node_id]
-            for n in stale_nodes:
-                self.partition_assignment.pop(n, None)
             old_partition = self.device_to_partition[device_id]
-            self.partition_assignment[node_id] = old_partition
-            print(f"[HALO] Recognized returning device {device_id}: "
-                  f"restoring partition {old_partition} to node {node_id}")
+            # Only treat as a genuine reconnect if this node_id doesn't
+            # already hold the device's known partition
+            if self.partition_assignment.get(node_id) != old_partition:
+                stale_nodes = [n for n, d in self.node_to_device.items()
+                               if d == device_id and n != node_id]
+                for n in stale_nodes:
+                    self.partition_assignment.pop(n, None)
+                self.partition_assignment[node_id] = old_partition
+                print(f"[HALO] Recognized returning device {device_id}: "
+                      f"restoring partition {old_partition} to node {node_id}")
         else:
             current = self.partition_assignment.get(node_id)
             if current is not None:
