@@ -1,0 +1,162 @@
+(halo-env313) PS D:\HALO-FL-Scheduler\quickstart-pytorch> flwr run . local-deploy --stream                                                                    
+🎊 Successfully started run 4044065401616446712
+INFO :      Starting logstream for run_id `4044065401616446712`
+INFO :      Start `flwr-serverapp` process
+Successfully installed quickstart-pytorch to C:\Users\Soumyadeep Saha\.flwr\apps\flwrlabs.quickstart-pytorch.1.1.6.477d1691.
+INFO :      Starting AdaptiveFedAvg strategy:
+INFO :          ├── Number of rounds: 4
+INFO :          ├── ArrayRecord (0.24 MB)
+INFO :          ├── ConfigRecord (train): {'lr': 0.1}
+INFO :          ├── ConfigRecord (evaluate): (empty!)
+INFO :          ├──> Sampling:
+INFO :          │       ├──Fraction: train (1.00) | evaluate ( 1.00)
+INFO :          │       ├──Minimum nodes: train (1) | evaluate (1)
+INFO :          │       └──Minimum available nodes: 1
+INFO :          └──> Keys in records:
+INFO :                  ├── Weighted by: 'num-examples'
+INFO :                  ├── ArrayRecord key: 'arrays'
+INFO :                  └── ConfigRecord key: 'config'
+INFO :      
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO :      Initial global evaluation results: {'accuracy': 0.1, 'loss': 2.304105650020551}
+INFO :      
+INFO :      [ROUND 1/4]
+[HALO] Round 1: node 4923775731832247518 score=None, local_epochs=2
+INFO :      configure_train: 1 nodes training, 0 skipped on low capacity (out of 1)
+[HALO DEBUG] node 4923775731832247518 -> {'train_loss': 2.1008075364112853, 'num-examples': 20000, 'telem_partition_id': 1, 'telem_device_id': 3143230519, 'telem_cpu_percent': 18.1, 'telem_mem_percent_used': 82.6, 'telem_mem_available_gb': 1.39, 'telem_battery_percent': 56, 'telem_battery_plugged_in': 1, 'telem_has_battery': 1, 'telem_network_latency_ms': 35.0}
+INFO :      aggregate_train: Received 1 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.1008075364112853, 'telem_cpu_percent': 18.1, 'telem_mem_percent_used': 82.6, 'telem_mem_available_gb': 1.39, 'telem_battery_percent': 56.0, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 35.0}
+INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+INFO :      aggregate_evaluate: Received 2 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.111246448033934, 'eval_acc': 0.19790000000000002, 'telem_cpu_percent': 32.55, 'telem_mem_percent_used': 79.1, 'telem_mem_available_gb': 3.55, 'telem_battery_percent': 48.5, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 26.6}
+INFO :      Global evaluation
+INFO :          └──> MetricRecord: {'accuracy': 0.1967, 'loss': 2.123531085026415}
+INFO :      
+INFO :      [ROUND 2/4]
+[HALO] Round 2: node 1567905398611146996 score=1.0, local_epochs=2
+[HALO] Round 2: node 4923775731832247518 score=1.0, local_epochs=2
+INFO :      configure_train: 2 nodes training, 0 skipped on low capacity (out of 2)
+[HALO DEBUG] node 4923775731832247518 -> {'train_loss': 2.1801951803207396, 'num-examples': 20000, 'telem_partition_id': 1, 'telem_device_id': 3143230519, 'telem_cpu_percent': 3.8, 'telem_mem_percent_used': 81.3, 'telem_mem_available_gb': 1.49, 'telem_battery_percent': 58, 'telem_battery_plugged_in': 1, 'telem_has_battery': 1, 'telem_network_latency_ms': 15.2}
+INFO :      aggregate_train: Received 1 results and 1 failures
+INFO :          > Received error in reply from node 1: Error: Node Unavailable — The destination node failed to report a heartbeat within 2 × its expected interval.
+INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.1801951803207396, 'telem_cpu_percent': 3.8, 'telem_mem_percent_used': 81.3, 'telem_mem_available_gb': 1.49, 'telem_battery_percent': 58.0, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 15.2}
+INFO :      configure_evaluate: Sampled 1 nodes (out of 1)
+INFO :      aggregate_evaluate: Received 1 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.2003589572420545, 'eval_acc': 0.1858, 'telem_cpu_percent': 5.7, 'telem_mem_percent_used': 81.4, 'telem_mem_available_gb': 1.49, 'telem_battery_percent': 58.0, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 27.9}
+INFO :      Global evaluation
+INFO :          └──> MetricRecord: {'accuracy': 0.1763, 'loss': 2.190572608875323}
+INFO :      
+INFO :      [ROUND 3/4]
+[HALO] Round 3: node 4923775731832247518 score=1.0, local_epochs=2
+[HALO] Round 3: reassigning partitions [0] from dropped nodes {1567905398611146996} to surviving node 4923775731832247518
+INFO :      configure_train: 1 nodes training, 0 skipped on low capacity (out of 1)
+[HALO DEBUG] node 4923775731832247518 -> {'train_loss': 2.253832862997055, 'num-examples': 40000, 'telem_partition_id': 1, 'telem_device_id': 3143230519, 'telem_cpu_percent': 9.1, 'telem_mem_percent_used': 80.6, 'telem_mem_available_gb': 1.55, 'telem_battery_percent': 59, 'telem_battery_plugged_in': 1, 'telem_has_battery': 1, 'telem_network_latency_ms': 35.4}
+INFO :      aggregate_train: Received 1 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.253832862997055, 'telem_cpu_percent': 9.1, 'telem_mem_percent_used': 80.6, 'telem_mem_available_gb': 1.55, 'telem_battery_percent': 59.0, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 35.4}
+INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+[HALO] Device 560480307 reconnected as node 9737300116204113642 (was 1567905398611146996) — partition 0 no longer dropped
+INFO :      aggregate_evaluate: Received 2 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.3087748251143534, 'eval_acc': 0.1037, 'telem_cpu_percent': 26.0, 'telem_mem_percent_used': 78.65, 'telem_mem_available_gb': 3.67, 'telem_battery_percent': 49.5, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 24.2}
+INFO :      Global evaluation
+INFO :          └──> MetricRecord: {'accuracy': 0.1, 'loss': 2.308829213999495}
+INFO :      
+INFO :      [ROUND 4/4]
+[HALO] Round 4: node 9737300116204113642 score=1.0, local_epochs=2
+[HALO] Round 4: node 4923775731832247518 score=1.0, local_epochs=2
+INFO :      configure_train: 2 nodes training, 0 skipped on low capacity (out of 2)
+[HALO DEBUG] node 4923775731832247518 -> {'train_loss': 2.310358708381653, 'num-examples': 20000, 'telem_partition_id': 1, 'telem_device_id': 3143230519, 'telem_cpu_percent': 4.3, 'telem_mem_percent_used': 81.3, 'telem_mem_available_gb': 1.49, 'telem_battery_percent': 61, 'telem_battery_plugged_in': 1, 'telem_has_battery': 1, 'telem_network_latency_ms': 33.6}
+[HALO DEBUG] node 9737300116204113642 -> {'train_loss': 2.3102037492752077, 'num-examples': 20000, 'telem_partition_id': 0, 'telem_device_id': 560480307, 'telem_cpu_percent': 24.6, 'telem_mem_percent_used': 75.0, 'telem_mem_available_gb': 5.94, 'telem_battery_percent': 40, 'telem_battery_plugged_in': 1, 'telem_has_battery': 1, 'telem_network_latency_ms': 249.5}
+INFO :      aggregate_train: Received 2 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.3102812288284302, 'telem_cpu_percent': 14.450000000000001, 'telem_mem_percent_used': 78.15, 'telem_mem_available_gb': 3.7150000000000003, 'telem_battery_percent': 50.5, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 141.55}
+INFO :      configure_evaluate: Sampled 2 nodes (out of 2)
+INFO :      aggregate_evaluate: Received 2 results and 0 failures
+INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.3045124240741606, 'eval_acc': 0.1043, 'telem_cpu_percent': 18.85, 'telem_mem_percent_used': 78.0, 'telem_mem_available_gb': 3.7649999999999997, 'telem_battery_percent': 51.5, 'telem_battery_plugged_in': 1.0, 'telem_has_battery': 1.0, 'telem_network_latency_ms': 30.9}
+INFO :      Global evaluation
+INFO :          └──> MetricRecord: {'accuracy': 0.1, 'loss': 2.3047700290438495}
+INFO :      
+INFO :      Strategy execution finished in 520.22s
+INFO :      
+INFO :      Final results:
+INFO :      
+INFO :          Global Arrays:
+INFO :                  ArrayRecord (0.238 MB)
+INFO :      
+INFO :          Aggregated ClientApp-side Train Metrics:
+INFO :          { 1: { 'telem_battery_percent': '5.6000e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '1.8100e+01',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '1.3900e+00',
+INFO :                 'telem_mem_percent_used': '8.2600e+01',
+INFO :                 'telem_network_latency_ms': '3.5000e+01',
+INFO :                 'train_loss': '2.1008e+00'},
+INFO :            2: { 'telem_battery_percent': '5.8000e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '3.8000e+00',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '1.4900e+00',
+INFO :                 'telem_mem_percent_used': '8.1300e+01',
+INFO :                 'telem_network_latency_ms': '1.5200e+01',
+INFO :                 'train_loss': '2.1802e+00'},
+INFO :            3: { 'telem_battery_percent': '5.9000e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '9.1000e+00',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '1.5500e+00',
+INFO :                 'telem_mem_percent_used': '8.0600e+01',
+INFO :                 'telem_network_latency_ms': '3.5400e+01',
+INFO :                 'train_loss': '2.2538e+00'},
+INFO :            4: { 'telem_battery_percent': '5.0500e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '1.4450e+01',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '3.7150e+00',
+INFO :                 'telem_mem_percent_used': '7.8150e+01',
+INFO :                 'telem_network_latency_ms': '1.4155e+02',
+INFO :                 'train_loss': '2.3103e+00'}}
+INFO :      
+INFO :          Aggregated ClientApp-side Evaluate Metrics:
+INFO :          { 1: { 'eval_acc': '1.9790e-01',
+INFO :                 'eval_loss': '2.1112e+00',
+INFO :                 'telem_battery_percent': '4.8500e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '3.2550e+01',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '3.5500e+00',
+INFO :                 'telem_mem_percent_used': '7.9100e+01',
+INFO :                 'telem_network_latency_ms': '2.6600e+01'},
+INFO :            2: { 'eval_acc': '1.8580e-01',
+INFO :                 'eval_loss': '2.2004e+00',
+INFO :                 'telem_battery_percent': '5.8000e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '5.7000e+00',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '1.4900e+00',
+INFO :                 'telem_mem_percent_used': '8.1400e+01',
+INFO :                 'telem_network_latency_ms': '2.7900e+01'},
+INFO :            3: { 'eval_acc': '1.0370e-01',
+INFO :                 'eval_loss': '2.3088e+00',
+INFO :                 'telem_battery_percent': '4.9500e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '2.6000e+01',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '3.6700e+00',
+INFO :                 'telem_mem_percent_used': '7.8650e+01',
+INFO :                 'telem_network_latency_ms': '2.4200e+01'},
+INFO :            4: { 'eval_acc': '1.0430e-01',
+INFO :                 'eval_loss': '2.3045e+00',
+INFO :                 'telem_battery_percent': '5.1500e+01',
+INFO :                 'telem_battery_plugged_in': '1.0000e+00',
+INFO :                 'telem_cpu_percent': '1.8850e+01',
+INFO :                 'telem_has_battery': '1.0000e+00',
+INFO :                 'telem_mem_available_gb': '3.7650e+00',
+INFO :                 'telem_mem_percent_used': '7.8000e+01',
+INFO :                 'telem_network_latency_ms': '3.0900e+01'}}
+INFO :      
+INFO :          ServerApp-side Evaluate Metrics:
+INFO :          { 0: {'accuracy': '1.0000e-01', 'loss': '2.3041e+00'},
+INFO :            1: {'accuracy': '1.9670e-01', 'loss': '2.1235e+00'},
+INFO :            2: {'accuracy': '1.7630e-01', 'loss': '2.1906e+00'},
+INFO :            3: {'accuracy': '1.0000e-01', 'loss': '2.3088e+00'},
+INFO :            4: {'accuracy': '1.0000e-01', 'loss': '2.3048e+00'}}
+INFO :      
