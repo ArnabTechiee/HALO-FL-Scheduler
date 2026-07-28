@@ -14,6 +14,16 @@ import psutil
 import socket
 import time
 import json
+import hashlib
+
+
+def get_device_id() -> int:
+    """Stable numeric ID for this physical machine, derived from its
+    hostname. Unlike Flower's node_id (which changes every time the
+    SuperNode process restarts), this stays constant across reconnects —
+    letting the Coordinator recognize a returning device as the same one."""
+    hostname = socket.gethostname()
+    return int(hashlib.sha256(hostname.encode()).hexdigest()[:8], 16)
 
 
 def get_cpu_usage():
@@ -87,6 +97,7 @@ def flatten_telemetry(snapshot: dict) -> dict:
     no None). Booleans are converted to 1/0, missing readings use -1."""
     battery = snapshot.get("battery")
     return {
+        "telem_device_id": get_device_id(),
         "telem_cpu_percent": snapshot["cpu_percent"],
         "telem_mem_percent_used": snapshot["memory"]["percent_used"],
         "telem_mem_available_gb": snapshot["memory"]["available_gb"],
