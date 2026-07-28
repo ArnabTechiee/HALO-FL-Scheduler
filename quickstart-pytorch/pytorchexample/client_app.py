@@ -1,4 +1,4 @@
-"""pytorchexample: A Flower / PyTorch app."""
+"""pytorchexample: A Flower / PyTorch app with HALO adaptive + reassignment."""
 
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
@@ -11,13 +11,16 @@ from pytorchexample.task import train as train_fn
 # --- HALO: import telemetry helpers from inside the package ---
 from pytorchexample.telemetry import get_telemetry_snapshot, flatten_telemetry
 
+# --- HALO: needed for combining reassigned partitions ---
+from torch.utils.data import ConcatDataset, DataLoader
+
 # Flower ClientApp
 app = ClientApp()
 
 
 @app.train()
 def train(msg: Message, context: Context):
-    """Train the model on local data."""
+    """Train the model on local data, possibly including reassigned partitions."""
 
     # Load the model and initialize it with the received weights
     model = Net()
@@ -25,13 +28,25 @@ def train(msg: Message, context: Context):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    # Load the data
+    # Load the base data partition
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
     trainloader, _ = load_data(partition_id, num_partitions, batch_size)
 
-    # Call the training function
+    # HALO: if the scheduler reassigned dropped nodes' partitions to us,
+    # load and combine them into one larger training set for this round
+    extra_ids = msg.content["config"].get("extra-partition-ids", [])
+    if extra_ids:
+        datasets = [trainloader.dataset]
+        for extra_id in extra_ids:
+            extra_loader, _ = load_data(extra_id, num_partitions, batch_size)
+            datasets.append(extra_loader.dataset)
+        combined_dataset = ConcatDataset(datasets)
+        trainloader = DataLoader(combined_dataset, batch_size=batch_size, shuffle=True)
+        print(f"[HALO] Training on own partition + reassigned partitions {list(extra_ids)}")
+
+    # Call the training function with (potentially enlarged) trainloader
     local_epochs = msg.content["config"].get(
         "local-epochs", context.run_config["local-epochs"]
     )
@@ -48,7 +63,7 @@ def train(msg: Message, context: Context):
     telemetry_snapshot = get_telemetry_snapshot()
     telemetry_fields = flatten_telemetry(telemetry_snapshot)
 
-    # 🔍 Temporary debug print to verify telemetry pipeline
+    # 🔍 Optional debug print to verify telemetry pipeline
     # print(f"[HALO DEBUG] Telemetry sent: {telemetry_fields}")
 
     # Construct and return reply Message
