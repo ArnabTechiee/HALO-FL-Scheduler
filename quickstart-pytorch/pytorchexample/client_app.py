@@ -71,6 +71,7 @@ def train(msg: Message, context: Context):
     metrics = {
         "train_loss": train_loss,
         "num-examples": len(trainloader.dataset),
+        "telem_partition_id": int(partition_id),  # ← ADDED: real partition ID
         **telemetry_fields,  # HALO: attach telemetry to this round's reply
     }
     metric_record = MetricRecord(metrics)
@@ -113,6 +114,7 @@ def evaluate(msg: Message, context: Context):
         "eval_loss": eval_loss,
         "eval_acc": eval_acc,
         "num-examples": len(valloader.dataset),
+        "telem_partition_id": int(partition_id),  # ← ADDED: real partition ID
         **telemetry_fields,
     }
     metric_record = MetricRecord(metrics)
