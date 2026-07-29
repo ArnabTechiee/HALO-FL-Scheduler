@@ -15,6 +15,7 @@ from collections.abc import Iterable
 from logging import INFO
 
 from pytorchexample.capacity_score import compute_capacity_score, score_to_local_epochs
+from pytorchexample.dashboard_state import update_node
 
 from flwr.app import (
     ArrayRecord,
@@ -100,10 +101,16 @@ class AdaptiveFedAvg(FedAvg):
 
             if local_epochs == 0:
                 print(f"[HALO] Round {server_round}: SKIPPING node {node_id} (score={score})")
+                # Dashboard: mark as skipped
+                update_node(node_id, score=score, local_epochs=0,
+                            status="skipped", last_round=server_round)
                 skipped.append(node_id)
                 continue
 
             print(f"[HALO] Round {server_round}: node {node_id} score={score}, local_epochs={local_epochs}")
+            # Dashboard: mark as training
+            update_node(node_id, score=score, local_epochs=local_epochs,
+                        status="training", last_round=server_round)
 
             per_client_config = ConfigRecord(dict(config))
             per_client_config["server-round"] = server_round
@@ -130,6 +137,9 @@ class AdaptiveFedAvg(FedAvg):
                 f"{extra_partitions} from dropped nodes {dropped_node_ids} "
                 f"to surviving node {survivor.metadata.dst_node_id}"
             )
+            # Dashboard: note the reassignment on the survivor node
+            update_node(survivor.metadata.dst_node_id,
+                        reassigned_partitions=extra_partitions)
 
         log(
             INFO,
@@ -156,6 +166,17 @@ class AdaptiveFedAvg(FedAvg):
                 self.node_to_real_partition[node_id] = int(metrics_dict["telem_partition_id"])
 
             print(f"[HALO DEBUG] node {node_id} -> {metrics_dict}")
+
+            # Dashboard: update node with latest telemetry, mark as active
+            update_node(
+                node_id,
+                num_examples=metrics_dict.get("num-examples"),
+                cpu_percent=metrics_dict.get("telem_cpu_percent"),
+                battery_percent=metrics_dict.get("telem_battery_percent"),
+                battery_plugged_in=bool(metrics_dict.get("telem_battery_plugged_in")),
+                network_latency_ms=metrics_dict.get("telem_network_latency_ms"),
+                status="active",
+            )
 
             # Strip identity fields *after* we have extracted what we need,
             # so the super() aggregation stays clean.
