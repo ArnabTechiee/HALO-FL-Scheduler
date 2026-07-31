@@ -17,13 +17,28 @@ import json
 import hashlib
 
 
-def get_device_id() -> int:
-    """Stable numeric ID for this physical machine, derived from its
+def get_device_id(salt: str = "") -> int:
+    """Stable numeric ID for this physical client, derived from its
     hostname. Unlike Flower's node_id (which changes every time the
     SuperNode process restarts), this stays constant across reconnects —
-    letting the Coordinator recognize a returning device as the same one."""
+    letting the Coordinator recognize a returning device as the same one.
+
+    `salt` distinguishes multiple client processes running on the SAME
+    physical machine (e.g. two SuperNode terminals on one laptop during
+    local testing) — without it, both would hash to the identical
+    device_id and the Coordinator would wrongly treat them as the same
+    device bouncing between connections. Pass something that's stable
+    per-process across restarts but differs between processes on the
+    same host — e.g. the assigned partition-id.
+
+    On genuinely separate physical laptops, hostnames already differ,
+    so the salt has no effect there and isn't required — but passing it
+    unconditionally is harmless and keeps single-machine testing safe
+    too, so client_app.py always supplies it.
+    """
     hostname = socket.gethostname()
-    return int(hashlib.sha256(hostname.encode()).hexdigest()[:8], 16)
+    key = f"{hostname}:{salt}" if salt else hostname
+    return int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
 
 
 def get_cpu_usage():
@@ -91,13 +106,19 @@ def get_telemetry_snapshot():
     }
 
 
-def flatten_telemetry(snapshot: dict) -> dict:
+def flatten_telemetry(snapshot: dict, device_id: int) -> dict:
     """Flattens the nested telemetry snapshot into flat scalar fields,
     since MetricRecord only supports int/float (no bools, no nested dicts,
-    no None). Booleans are converted to 1/0, missing readings use -1."""
+    no None). Booleans are converted to 1/0, missing readings use -1.
+
+    device_id is now passed in (computed once by the caller via
+    get_device_id(salt=...)) rather than recomputed here, since the
+    caller is the one that knows the correct salt to use (e.g. its own
+    partition-id) — this function has no way to know that on its own.
+    """
     battery = snapshot.get("battery")
     return {
-        "telem_device_id": get_device_id(),
+        "telem_device_id": device_id,
         "telem_cpu_percent": snapshot["cpu_percent"],
         "telem_mem_percent_used": snapshot["memory"]["percent_used"],
         "telem_mem_available_gb": snapshot["memory"]["available_gb"],

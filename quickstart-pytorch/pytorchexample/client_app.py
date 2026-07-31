@@ -9,7 +9,7 @@ from pytorchexample.task import test as test_fn
 from pytorchexample.task import train as train_fn
 
 # --- HALO: import telemetry helpers from inside the package ---
-from pytorchexample.telemetry import get_telemetry_snapshot, flatten_telemetry
+from pytorchexample.telemetry import get_telemetry_snapshot, flatten_telemetry, get_device_id
 
 # --- HALO: needed for combining reassigned partitions ---
 from torch.utils.data import ConcatDataset, DataLoader
@@ -60,8 +60,12 @@ def train(msg: Message, context: Context):
     )
 
     # --- HALO: capture telemetry right after local training finishes ---
+    # device_id is salted with this process's OWN partition-id, so two
+    # SuperNode processes on the same physical machine (same hostname)
+    # never collide into the same device_id.
+    device_id = get_device_id(salt=str(partition_id))
     telemetry_snapshot = get_telemetry_snapshot()
-    telemetry_fields = flatten_telemetry(telemetry_snapshot)
+    telemetry_fields = flatten_telemetry(telemetry_snapshot, device_id)
 
     # 🔍 Optional debug print to verify telemetry pipeline
     # print(f"[HALO DEBUG] Telemetry sent: {telemetry_fields}")
@@ -71,7 +75,7 @@ def train(msg: Message, context: Context):
     metrics = {
         "train_loss": train_loss,
         "num-examples": len(trainloader.dataset),
-        "telem_partition_id": int(partition_id),  # ← ADDED: real partition ID
+        "telem_partition_id": int(partition_id),
         **telemetry_fields,  # HALO: attach telemetry to this round's reply
     }
     metric_record = MetricRecord(metrics)
@@ -106,15 +110,16 @@ def evaluate(msg: Message, context: Context):
     # from training this round still reports current conditions — without
     # this, a skipped client's telemetry freezes forever since it never
     # trains again to send a fresh reading
+    device_id = get_device_id(salt=str(partition_id))
     telemetry_snapshot = get_telemetry_snapshot()
-    telemetry_fields = flatten_telemetry(telemetry_snapshot)
+    telemetry_fields = flatten_telemetry(telemetry_snapshot, device_id)
 
     # Construct and return reply Message
     metrics = {
         "eval_loss": eval_loss,
         "eval_acc": eval_acc,
         "num-examples": len(valloader.dataset),
-        "telem_partition_id": int(partition_id),  # ← ADDED: real partition ID
+        "telem_partition_id": int(partition_id),
         **telemetry_fields,
     }
     metric_record = MetricRecord(metrics)
