@@ -4,14 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-pytorch"
-version = "1.1.6"
-description = "Federated Learning with PyTorch and Flower (Quickstart Example)"
+version = "1.2.0"
+description = "HALO — telemetry-aware federated scheduling with fault-tolerant partition reassignment"
 license = {file = "LICENSE"}
 dependencies = [
     "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
     "torch==2.10.0",
     "torchvision==0.25.0",
+    "psutil>=5.9.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -34,18 +35,28 @@ learning-rate = 0.1
 batch-size = 32
 save-model = false
 
+# ── HALO ──────────────────────────────────────────────────────────────
+# halo-mode = "adaptive"  -> telemetry scheduling + partition reassignment
+# halo-mode = "baseline"  -> stock FedAvg, fixed epochs, no reassignment
+# Run once in each mode; the dashboard's comparison panel fills itself in.
+halo-mode = "adaptive"
+
+# Epoch budget for a device at full capacity. Keep this >= 3: the capacity
+# score maps to base, 0.75x, 0.5x and 1 epoch, so base=2 collapses every
+# tier into "1 or 2" and the adaptation is invisible in the results.
+base-local-epochs = 3
+
+# Cosmetic only — shown in the dashboard header.
+dataset-name = "CIFAR-10"
+model-name = "CNN (0.24 MB)"
+
 
 #######################################################################
 # CONFIGURATION MIGRATION NOTICE:
 #
 # What was previously called "federation config" for SuperLink
 # connections in pyproject.toml has been renamed and moved.
-#
-# These settings are now **SuperLink connection configuration**
-# and are defined in the Flower configuration file.
-#
-# The entries below are commented out intentionally and are kept
-# only as a migration reference.
+# These entries are kept only as a migration reference.
 #
 # Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
 #######################################################################

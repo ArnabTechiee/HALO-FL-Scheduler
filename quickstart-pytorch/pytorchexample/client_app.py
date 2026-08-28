@@ -8,45 +8,83 @@ from pytorchexample.task import Net, load_data
 from pytorchexample.task import test as test_fn
 from pytorchexample.task import train as train_fn
 
-# --- HALO: import telemetry helpers from inside the package ---
+# --- HALO: telemetry helpers ---
 from pytorchexample.telemetry import get_telemetry_snapshot, flatten_telemetry, get_device_id
 
 # --- HALO: needed for combining reassigned partitions ---
 from torch.utils.data import ConcatDataset, DataLoader
 
-# Flower ClientApp
 app = ClientApp()
+
+
+def _identity(context: Context):
+    """Stable identity for this SuperNode.
+
+    device_id is salted with this process's own partition-id so two
+    SuperNodes on the same physical machine (same hostname) never collide
+    into one device_id. It survives a disconnect, which is exactly what
+    lets the server recognise a revived node as the same participant.
+    """
+    partition_id = context.node_config["partition-id"]
+    return get_device_id(salt=str(partition_id)), int(partition_id)
+
+
+@app.query()
+def identify(msg: Message, context: Context):
+    """HALO identity probe.
+
+    The scheduler sends this to any node it doesn't recognise, at the top of
+    a round, before it decides who trains. Answering it lets the server:
+      * match a reconnecting SuperNode to its existing record immediately,
+        instead of a round later,
+      * schedule round 1 with real telemetry instead of a blind default.
+
+    Deliberately cheap: no model, no data loading.
+    """
+    device_id, partition_id = _identity(context)
+    telemetry = flatten_telemetry(get_telemetry_snapshot(), device_id)
+    metrics = {
+        "telem_device_id": device_id,
+        "telem_partition_id": partition_id,
+        "halo_probe_ok": 1,
+        **telemetry,
+    }
+    return Message(content=RecordDict({"metrics": MetricRecord(metrics)}), reply_to=msg)
 
 
 @app.train()
 def train(msg: Message, context: Context):
-    """Train the model on local data, possibly including reassigned partitions."""
+    """Train on local data, possibly including reassigned partitions."""
 
-    # Load the model and initialize it with the received weights
+    device_id, partition_id = _identity(context)
+
+    # HALO: snapshot telemetry BEFORE training starts.
+    # Sampling after train_fn() returns reports the trainer, not the device
+    # — every client came back at telem_cpu_percent 100.0, which flattened
+    # the capacity score across the whole fleet. This reading is what the
+    # scheduler will use to plan the NEXT round, so it should describe the
+    # device at rest, not mid-backprop.
+    telemetry_fields = flatten_telemetry(get_telemetry_snapshot(), device_id)
+
     model = Net()
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    # Load the base data partition
-    partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
     trainloader, _ = load_data(partition_id, num_partitions, batch_size)
 
-    # HALO: if the scheduler reassigned dropped nodes' partitions to us,
-    # load and combine them into one larger training set for this round
+    # HALO: absorb partitions the scheduler reassigned to us from dropped devices
     extra_ids = msg.content["config"].get("extra-partition-ids", [])
     if extra_ids:
         datasets = [trainloader.dataset]
         for extra_id in extra_ids:
             extra_loader, _ = load_data(extra_id, num_partitions, batch_size)
             datasets.append(extra_loader.dataset)
-        combined_dataset = ConcatDataset(datasets)
-        trainloader = DataLoader(combined_dataset, batch_size=batch_size, shuffle=True)
-        print(f"[HALO] Training on own partition + reassigned partitions {list(extra_ids)}")
+        trainloader = DataLoader(ConcatDataset(datasets), batch_size=batch_size, shuffle=True)
+        print(f"[HALO] Training on own partition + reassigned {list(extra_ids)}")
 
-    # Call the training function with (potentially enlarged) trainloader
     local_epochs = msg.content["config"].get(
         "local-epochs", context.run_config["local-epochs"]
     )
@@ -59,27 +97,15 @@ def train(msg: Message, context: Context):
         device,
     )
 
-    # --- HALO: capture telemetry right after local training finishes ---
-    # device_id is salted with this process's OWN partition-id, so two
-    # SuperNode processes on the same physical machine (same hostname)
-    # never collide into the same device_id.
-    device_id = get_device_id(salt=str(partition_id))
-    telemetry_snapshot = get_telemetry_snapshot()
-    telemetry_fields = flatten_telemetry(telemetry_snapshot, device_id)
-
-    # 🔍 Optional debug print to verify telemetry pipeline
-    # print(f"[HALO DEBUG] Telemetry sent: {telemetry_fields}")
-
-    # Construct and return reply Message
     model_record = ArrayRecord(model.state_dict())
     metrics = {
         "train_loss": train_loss,
         "num-examples": len(trainloader.dataset),
-        "telem_partition_id": int(partition_id),
-        **telemetry_fields,  # HALO: attach telemetry to this round's reply
+        "telem_device_id": device_id,
+        "telem_partition_id": partition_id,
+        **telemetry_fields,
     }
-    metric_record = MetricRecord(metrics)
-    content = RecordDict({"arrays": model_record, "metrics": metric_record})
+    content = RecordDict({"arrays": model_record, "metrics": MetricRecord(metrics)})
     return Message(content=content, reply_to=msg)
 
 
@@ -87,41 +113,31 @@ def train(msg: Message, context: Context):
 def evaluate(msg: Message, context: Context):
     """Evaluate the model on local data."""
 
-    # Load the model and initialize it with the received weights
+    device_id, partition_id = _identity(context)
+
     model = Net()
     model.load_state_dict(msg.content["arrays"].to_torch_state_dict())
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    # Load the data
-    partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     batch_size = context.run_config["batch-size"]
     _, valloader = load_data(partition_id, num_partitions, batch_size)
 
-    # Call the evaluation function
-    eval_loss, eval_acc = test_fn(
-        model,
-        valloader,
-        device,
-    )
+    eval_loss, eval_acc = test_fn(model, valloader, device)
 
-    # --- HALO: refresh telemetry here too, so a client that was skipped
-    # from training this round still reports current conditions — without
-    # this, a skipped client's telemetry freezes forever since it never
-    # trains again to send a fresh reading
-    device_id = get_device_id(salt=str(partition_id))
-    telemetry_snapshot = get_telemetry_snapshot()
-    telemetry_fields = flatten_telemetry(telemetry_snapshot, device_id)
+    # Refresh telemetry here too: a device that was skipped from training
+    # never sends a train reply, so its readings would otherwise freeze at
+    # whatever got it skipped and it could never earn its way back in.
+    telemetry_fields = flatten_telemetry(get_telemetry_snapshot(), device_id)
 
-    # Construct and return reply Message
     metrics = {
         "eval_loss": eval_loss,
         "eval_acc": eval_acc,
         "num-examples": len(valloader.dataset),
-        "telem_partition_id": int(partition_id),
+        "telem_device_id": device_id,
+        "telem_partition_id": partition_id,
         **telemetry_fields,
     }
-    metric_record = MetricRecord(metrics)
-    content = RecordDict({"metrics": metric_record})
+    content = RecordDict({"metrics": MetricRecord(metrics)})
     return Message(content=content, reply_to=msg)

@@ -3,8 +3,7 @@ HALO Telemetry Agent
 ---------------------
 Reads live hardware signals (CPU load, RAM headroom, battery %, network
 latency) from the laptop it runs on. This is the raw data the adaptive
-scheduler will later use to decide how much training work each laptop
-should get.
+scheduler uses to decide how much training work each laptop should get.
 
 Includes a flattening function that converts the nested snapshot into
 a flat dictionary of scalars safe for MetricRecord (int/float only).
@@ -16,11 +15,22 @@ import time
 import json
 import hashlib
 
+# Sampling window for the CPU read. Long enough to be a real measurement,
+# short enough that three snapshots per round per device cost ~1s total.
+CPU_SAMPLE_SECONDS = 0.3
+
+# Consecutive rounds where every latency target was unreachable. One failed
+# probe is a blip; two in a row is a genuinely offline device.
+_latency_failures = 0
+
+LATENCY_TARGETS = (("8.8.8.8", 53), ("1.1.1.1", 53))
+SOFT_FAIL_LATENCY_MS = 900.0
+
 
 def get_device_id(salt: str = "") -> int:
     """Stable numeric ID for this physical client, derived from its
     hostname. Unlike Flower's node_id (which changes every time the
-    SuperNode process restarts), this stays constant across reconnects —
+    SuperNode process reconnects), this stays constant across reconnects —
     letting the Coordinator recognize a returning device as the same one.
 
     `salt` distinguishes multiple client processes running on the SAME
@@ -42,14 +52,21 @@ def get_device_id(salt: str = "") -> int:
 
 
 def get_cpu_usage():
-    """Returns current CPU usage as a percentage (0-100).
-    interval=1 means it measures over 1 second for an accurate reading
-    (instant reads with interval=0 can be misleading/noisy)."""
-    return psutil.cpu_percent(interval=1)
+    """Current CPU usage as a percentage (0-100).
+
+    Uses a short blocking sample, NOT interval=None. Flower spawns a fresh
+    ClientApp process per message, so a non-blocking read has no meaningful
+    baseline to measure against — it reports CPU time since module import,
+    which is milliseconds earlier. That produced exactly the garbage seen in
+    the last run: 100.0 in rounds 1-2 (import raced the model/data load) and
+    0.0 in round 4. interval=1 was accurate but cost a full second per call;
+    0.3s is a real measurement at a third of the price.
+    """
+    return psutil.cpu_percent(interval=CPU_SAMPLE_SECONDS)
 
 
 def get_memory_info():
-    """Returns RAM stats: total, available, and percent used."""
+    """RAM stats: total, available, and percent used."""
     mem = psutil.virtual_memory()
     return {
         "total_gb": round(mem.total / (1024 ** 3), 2),
@@ -59,9 +76,11 @@ def get_memory_info():
 
 
 def get_battery_info():
-    """Returns battery percentage and charging status.
-    Returns None if the machine has no battery (e.g. a desktop) —
-    the scheduler should treat that as 'always fine, ignore battery'."""
+    """Battery percentage and charging status.
+
+    Returns None if the machine has no battery (e.g. a desktop) — the
+    scheduler treats that as 'always fine, ignore battery'.
+    """
     battery = psutil.sensors_battery()
     if battery is None:
         return None
@@ -77,25 +96,45 @@ def get_battery_info():
     }
 
 
-def get_network_latency(host="8.8.8.8", port=53, timeout=2):
-    """Measures round-trip time (ms) to a reachable host as a simple
-    proxy for network quality. Uses a raw TCP connect rather than ping,
-    since ping (ICMP) is sometimes blocked while TCP isn't.
-    Returns None if unreachable within the timeout."""
-    try:
-        start = time.time()
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        sock.connect((host, port))
-        sock.close()
-        return round((time.time() - start) * 1000, 1)  # ms
-    except (socket.error, socket.timeout):
-        return None
+def get_network_latency(timeout=2):
+    """Round-trip time (ms) to a reachable host, as a proxy for link quality.
+
+    Uses a raw TCP connect rather than ping, since ICMP is often blocked
+    while TCP isn't.
+
+    Tries a second target before giving up, and reports a single total
+    failure as merely slow rather than offline. This matters because the
+    capacity scorer treats an unreachable network as a HARD SKIP: one
+    firewalled DNS port on campus Wi-Fi or a VPN would otherwise eject
+    every device in the fleet from every round. Returns None only after
+    two consecutive rounds where no target answered.
+    """
+    global _latency_failures
+    for target in LATENCY_TARGETS:
+        sock = None
+        try:
+            start = time.time()
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            sock.connect(target)
+            _latency_failures = 0
+            return round((time.time() - start) * 1000, 1)
+        except (socket.error, socket.timeout):
+            continue
+        finally:
+            if sock is not None:
+                try:
+                    sock.close()
+                except socket.error:
+                    pass
+
+    _latency_failures += 1
+    return None if _latency_failures >= 2 else SOFT_FAIL_LATENCY_MS
 
 
 def get_telemetry_snapshot():
-    """Combines all signals into a single dictionary — this is what
-    gets sent to the Coordinator/scheduler in the real system."""
+    """All signals in one dictionary — this is what gets sent to the
+    Coordinator/scheduler."""
     return {
         "timestamp": time.time(),
         "hostname": socket.gethostname(),
@@ -107,16 +146,20 @@ def get_telemetry_snapshot():
 
 
 def flatten_telemetry(snapshot: dict, device_id: int) -> dict:
-    """Flattens the nested telemetry snapshot into flat scalar fields,
-    since MetricRecord only supports int/float (no bools, no nested dicts,
-    no None). Booleans are converted to 1/0, missing readings use -1.
+    """Flatten the nested snapshot into scalar fields, since MetricRecord
+    only supports int/float (no bools, no nested dicts, no None). Booleans
+    become 1/0; missing readings use -1.
 
-    device_id is now passed in (computed once by the caller via
-    get_device_id(salt=...)) rather than recomputed here, since the
-    caller is the one that knows the correct salt to use (e.g. its own
-    partition-id) — this function has no way to know that on its own.
+    -1 is a SENTINEL, not a measurement. Consumers must gate on
+    telem_has_battery before reading telem_battery_percent, and treat a
+    negative latency as 'unreachable' rather than 'very fast'.
+
+    device_id is passed in (computed once by the caller via
+    get_device_id(salt=...)) rather than recomputed here, since only the
+    caller knows the correct salt to use — its own partition-id.
     """
     battery = snapshot.get("battery")
+    latency = snapshot.get("network_latency_ms")
     return {
         "telem_device_id": device_id,
         "telem_cpu_percent": snapshot["cpu_percent"],
@@ -125,19 +168,15 @@ def flatten_telemetry(snapshot: dict, device_id: int) -> dict:
         "telem_battery_percent": battery["percent"] if battery else -1,
         "telem_battery_plugged_in": int(battery["plugged_in"]) if battery else 0,
         "telem_has_battery": int(battery is not None),
-        "telem_network_latency_ms": (
-            snapshot["network_latency_ms"]
-            if snapshot["network_latency_ms"] is not None
-            else -1
-        ),
+        "telem_network_latency_ms": latency if latency is not None else -1,
     }
 
 
 def print_snapshot_loop(interval_seconds=5):
-    """Prints a fresh telemetry snapshot every few seconds — useful for
-    watching how the numbers change on a real laptop over time (e.g.
-    unplug the charger and watch battery/plugged_in update)."""
-    print(f"Starting telemetry monitor (Ctrl+C to stop)...\n")
+    """Print a fresh snapshot every few seconds — useful for watching the
+    numbers move on a real laptop (unplug the charger and watch
+    battery/plugged_in update)."""
+    print("Starting telemetry monitor (Ctrl+C to stop)...\n")
     try:
         while True:
             snapshot = get_telemetry_snapshot()
@@ -149,5 +188,8 @@ def print_snapshot_loop(interval_seconds=5):
 
 
 if __name__ == "__main__":
-    # Standalone test — just run: python telemetry.py
-    print_snapshot_loop(interval_seconds=5)
+    print("Single snapshot:")
+    print(json.dumps(get_telemetry_snapshot(), indent=2))
+    print("\nFlattened:")
+    print(json.dumps(flatten_telemetry(get_telemetry_snapshot(),
+                                       get_device_id(salt="0")), indent=2))
