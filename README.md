@@ -1,4 +1,4 @@
-# HALO: Heterogeneous Adaptive Learning Orchestrator
+# HALO: Heterogeneous Adaptive Learning Orchestrator..
 
 **HALO** (Heterogeneous Adaptive Learning Orchestrator) is a fault‑tolerant, adaptive federated learning scheduler built on top of the [Flower](https://flower.dev) framework. It extends the standard `FedAvg` strategy to handle real‑world edge‑device variability by:
 
